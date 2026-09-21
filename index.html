@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Telegram Presence Monitor</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="card">
+  <h1>Telegram Presence Monitor</h1>
+  <p class="muted">Consent-based monitoring for an authorized contact.</p>
+
+  <button id="connect">Connect Telegram</button>
+
+  <section id="panel" class="hidden">
+    <label>Authorized contact</label>
+    <input id="contact" placeholder="@username or authorized contact ID">
+    <button id="start">Start monitoring</button>
+    <button id="stop" class="secondary">Stop</button>
+
+    <div id="status" class="status">Disconnected</div>
+    <div id="last">No status received yet.</div>
+  </section>
+
+  <p class="note">
+    This starter does not bypass Telegram privacy controls. Connect it to a
+    secure backend using Telegram's official APIs before production use.
+  </p>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
