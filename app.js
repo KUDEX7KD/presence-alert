@@ -7,8 +7,58 @@ const last = document.getElementById('last');
 
 const BACKEND_URL = 'https://presence-alert.onrender.com';
 
+// Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyAiSPUpt0xsca4fXrdSPgjUZF6D322KMG8",
+  authDomain: "presence-alert.firebaseapp.com",
+  projectId: "presence-alert",
+  storageBucket: "presence-alert.firebasestorage.app",
+  messagingSenderId: "455704742798",
+  appId: "1:455704742798:web:3a02222567464a9fedb2df",
+};
+
+firebase.initializeApp(firebaseConfig);
+
+const messaging = firebase.messaging();
+
 let timer = null;
 let previous = null;
+
+// Firebase notification setup
+async function setupNotifications() {
+  try {
+    if (!('Notification' in window)) {
+      console.log('Notifications are not supported.');
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+
+    if (permission !== 'granted') {
+      console.log('Notification permission not granted.');
+      return;
+    }
+
+    const registration =
+      await navigator.serviceWorker.register(
+        './firebase-messaging-sw.js'
+      );
+
+    console.log('Firebase service worker registered.');
+
+    // Use the PUBLIC VAPID key generated in Firebase Console.
+    const token = await messaging.getToken({
+      vapidKey: 'BMo2kwk4kl-SCD99kSul0zxCVaM2ZMAzqeyOSLhp2_NR-rb4kDri8RSCLzW0AsGInjlGor34Xyb3XY4rTLmcetI',
+      serviceWorkerRegistration: registration
+    });
+
+    console.log('FCM token:', token);
+
+    // Token will later be sent to the secure backend.
+  } catch (error) {
+    console.error('Notification setup failed:', error);
+  }
+}
 
 connect.onclick = async () => {
   panel.classList.remove('hidden');
@@ -19,10 +69,7 @@ connect.onclick = async () => {
   status.textContent = 'Ready';
   status.className = 'status';
 
-  // Ask for notification permission
-  if ('Notification' in window && Notification.permission === 'default') {
-    await Notification.requestPermission();
-  }
+  await setupNotifications();
 };
 
 start.onclick = async () => {
@@ -83,7 +130,6 @@ function updatePresence(data) {
     status.textContent = '🟢 Online';
     status.className = 'status online';
 
-    // Notification only when status changes to Online
     if (
       previous !== 'online' &&
       'Notification' in window &&
