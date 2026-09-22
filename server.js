@@ -216,37 +216,7 @@ app.get("/", (req, res) => {
     telegram: telegramReady
   });
 });
-/* ---------------- Temporary self status test ---------------- */
 
-app.get("/api/test-my-status", async (req, res) => {
-  try {
-    if (!telegramReady || !client) {
-      return res.json({
-        connected: false,
-        message: "Telegram account is not connected"
-      });
-    }
-
-    const user = await client.getEntity("@Worldindkkd");
-    const status = user?.status;
-
-    const statusName =
-      status?.className ||
-      status?.constructor?.name ||
-      "";
-
-    res.json({
-      username: "@Worldindkkd",
-      status: statusName
-    });
-
-  } catch (error) {
-    res.status(500).json({
-      username: "@Worldindkkd",
-      error: error.message
-    });
-  }
-});
 /* ---------------- Telegram status API ---------------- */
 
 app.get("/api/status", async (req, res) => {
