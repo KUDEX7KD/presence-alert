@@ -84,37 +84,42 @@ connect.onclick = async () => {
 
 start.onclick = async () => {
   clearInterval(timer);
+clearInterval(timer);
 
-  const checkStatus = async () => {
-    try {
-      const response = await fetch(
-        `${BACKEND_URL}/api/status`,
-        { cache: 'no-store' }
-      );
-
-      if (!response.ok) {
-        throw new Error('Backend error');
+const checkStatus = async () => {
+  try {
+    const response = await fetch(
+      `${BACKEND_URL}/api/status?t=${Date.now()}`,
+      {
+        method: 'GET',
+        cache: 'no-store'
       }
+    );
 
-      const data = await response.json();
-
-      updatePresence(data);
-
-    } catch (error) {
-      status.textContent = 'Backend connection failed';
-      status.className = 'status offline';
-
-      last.textContent =
-        'Could not connect to Presence Alert server.';
+    if (!response.ok) {
+      throw new Error(`Backend returned ${response.status}`);
     }
-  };
 
-  status.textContent = 'Checking backend...';
-  status.className = 'status';
+    const data = await response.json();
 
-  await checkStatus();
+    updatePresence(data);
 
-  timer = setInterval(checkStatus, 5000);
+  } catch (error) {
+    console.error('Backend check failed:', error);
+
+    status.textContent = 'Backend connection failed';
+    status.className = 'status offline';
+
+    last.textContent = 'Could not connect to Presence Alert server.';
+  }
+};
+
+status.textContent = 'Checking backend...';
+status.className = 'status';
+
+await checkStatus();
+
+timer = setInterval(checkStatus, 5000);
 };
 
 stop.onclick = () => {
