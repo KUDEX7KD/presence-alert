@@ -37,13 +37,11 @@ start.onclick = async () => {
 
       const data = await response.json();
 
-      updatePresence(data.online);
+      updatePresence(data);
 
-      if (data.message) {
-        last.textContent = data.message;
-      }
     } catch (error) {
       status.textContent = 'Backend connection failed';
+      status.className = 'status offline';
       last.textContent = 'Could not connect to Presence Alert server.';
     }
   };
@@ -58,21 +56,40 @@ stop.onclick = () => {
   clearInterval(timer);
   timer = null;
   status.textContent = 'Monitoring stopped';
+  status.className = 'status';
 };
 
-function updatePresence(isOnline) {
-  status.textContent = isOnline ? '🟢 Online' : '⚪ Offline';
-  status.className = 'status ' + (isOnline ? 'online' : 'offline');
-  last.textContent = 'Updated: ' + new Date().toLocaleString();
+function updatePresence(data) {
+  const availability = data.availability;
 
-  if (
-    isOnline &&
-    previous === false &&
-    'Notification' in window &&
-    Notification.permission === 'granted'
-  ) {
-    new Notification('Telegram contact is online');
+  if (availability === 'online') {
+    status.textContent = '🟢 Online';
+    status.className = 'status online';
+
+    if (
+      previous !== 'online' &&
+      'Notification' in window &&
+      Notification.permission === 'granted'
+    ) {
+      new Notification('Telegram contact is online');
+    }
+
+  } else if (availability === 'recently') {
+    status.textContent = '🟡 Recently active';
+    status.className = 'status recently';
+
+  } else if (availability === 'offline') {
+    status.textContent = '⚪ Offline';
+    status.className = 'status offline';
+
+  } else {
+    status.textContent = '⚫ Status unavailable';
+    status.className = 'status unavailable';
   }
 
-  previous = isOnline;
-}
+  last.textContent = data.message
+    ? data.message + ' • Updated: ' + new Date().toLocaleString()
+    : 'Updated: ' + new Date().toLocaleString();
+
+  previous = availability;
+      }
