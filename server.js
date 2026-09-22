@@ -15,16 +15,14 @@ app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(204);
-  }
-
+  if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
 });
 
 const apiId = Number(process.env.TELEGRAM_API_ID);
 const apiHash = process.env.TELEGRAM_API_HASH;
 const sessionString = process.env.TELEGRAM_SESSION || "";
+const targetPhone = process.env.TARGET_PHONE || "";
 
 let client = null;
 let telegramReady = false;
@@ -36,25 +34,18 @@ async function connectTelegram() {
       return;
     }
 
-    const session = new StringSession(sessionString);
-
     client = new TelegramClient(
-      session,
+      new StringSession(sessionString),
       apiId,
       apiHash,
-      {
-        connectionRetries: 5
-      }
+      { connectionRetries: 5 }
     );
 
     await client.connect();
-
-    const me = await client.getMe();
+    await client.getMe();
 
     telegramReady = true;
-
-    console.log("Telegram connected.");
-    console.log("Logged in as:", me.username || me.firstName || "User");
+    console.log("Telegram connected successfully.");
   } catch (error) {
     telegramReady = false;
     console.error("Telegram connection failed:", error.message);
@@ -78,19 +69,17 @@ app.get("/api/status", async (req, res) => {
       });
     }
 
-    const username = String(req.query.username || "").trim();
-
-    if (!username) {
+    if (!targetPhone) {
       return res.status(400).json({
         connected: true,
         online: false,
-        message: "Username is required"
+        message: "Target contact is not configured"
       });
     }
 
-    const user = await client.getEntity(username);
+    const user = await client.getEntity(targetPhone);
+    const status = user?.status;
 
-    const status = user.status;
     const statusName =
       status?.className ||
       status?.constructor?.name ||
@@ -102,12 +91,11 @@ app.get("/api/status", async (req, res) => {
 
     res.json({
       connected: true,
-      username: username,
-      online: online,
+      online,
       status: statusName,
       message: online
-        ? "User is online"
-        : "User is offline or status is unavailable"
+        ? "Contact is online"
+        : "Contact is offline or status is unavailable"
     });
 
   } catch (error) {
@@ -116,7 +104,7 @@ app.get("/api/status", async (req, res) => {
     res.status(500).json({
       connected: telegramReady,
       online: false,
-      message: "Could not check Telegram status"
+      message: "Could not find or check the contact"
     });
   }
 });
