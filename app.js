@@ -73,13 +73,6 @@ connect.onclick = async () => {
 };
 
 start.onclick = async () => {
-  const contact = document.getElementById('contact').value.trim();
-
-  if (!contact) {
-    alert('Enter the authorized contact.');
-    return;
-  }
-
   clearInterval(timer);
 
   const checkStatus = async () => {
