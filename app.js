@@ -54,7 +54,17 @@ async function setupNotifications() {
 
     console.log('FCM token:', token);
 
-    // Token will later be sent to the secure backend.
+await fetch(`${BACKEND_URL}/api/push/register`, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    token: token
+  })
+});
+
+console.log('FCM token registered with backend.');
   } catch (error) {
     console.error('Notification setup failed:', error);
   }
