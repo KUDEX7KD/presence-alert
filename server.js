@@ -86,16 +86,38 @@ app.get("/api/status", async (req, res) => {
       "";
 
     const online =
-      statusName === "UserStatusOnline" ||
-      statusName === "userStatusOnline";
+  statusName === "UserStatusOnline" ||
+  statusName === "userStatusOnline";
+
+let availability = "unavailable";
+
+if (online) {
+  availability = "online";
+} else if (
+  statusName === "UserStatusOffline" ||
+  statusName === "userStatusOffline"
+) {
+  availability = "offline";
+} else if (
+  statusName === "UserStatusRecently" ||
+  statusName === "userStatusRecently"
+) {
+  availability = "recently";
+}
 
     res.json({
       connected: true,
       online,
-      status: statusName,
-      message: online
-        ? "Contact is online"
-        : "Contact is offline or status is unavailable"
+status: statusName,
+availability,
+message:
+  availability === "online"
+    ? "Contact is online"
+    : availability === "offline"
+    ? "Contact is offline"
+    : availability === "recently"
+    ? "Contact was recently active"
+    : "Contact status is unavailable"
     });
 
   } catch (error) {
