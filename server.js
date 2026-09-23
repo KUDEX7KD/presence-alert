@@ -302,7 +302,39 @@ app.get("/api/status", async (req, res) => {
     });
   }
 });
+/* ---------------- Temporary bot status test ---------------- */
 
+app.get("/api/test-bot-status", async (req, res) => {
+  try {
+    if (!telegramReady || !client) {
+      return res.json({
+        connected: false,
+        message: "Telegram account is not connected"
+      });
+    }
+
+    const user = await client.getEntity("@dogs3xxbots");
+    const status = user?.status;
+
+    const statusName =
+      status?.className ||
+      status?.constructor?.name ||
+      "";
+
+    res.json({
+      username: "@dogs3xxbots",
+      status: statusName
+    });
+
+  } catch (error) {
+    console.error("Bot status test error:", error.message);
+
+    res.status(500).json({
+      username: "@dogs3xxbots",
+      error: error.message
+    });
+  }
+});
 /* ---------------- Register FCM device ---------------- */
 
 app.post("/api/push/register", (req, res) => {
