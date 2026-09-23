@@ -302,46 +302,7 @@ app.get("/api/status", async (req, res) => {
     });
   }
 });
-/* ---------------- Temporary KD status test ---------------- */
 
-app.get("/api/test-kd-status", async (req, res) => {
-  try {
-    if (!telegramReady || !client) {
-      return res.json({
-        connected: false,
-        message: "Telegram account is not connected"
-      });
-    }
-
-    if (!targetPhone) {
-      return res.status(400).json({
-        connected: true,
-        message: "KD target is not configured"
-      });
-    }
-
-    const user = await client.getEntity(targetPhone);
-    const status = user?.status;
-
-    const statusName =
-      status?.className ||
-      status?.constructor?.name ||
-      "";
-
-    res.json({
-      target: "KD",
-      status: statusName
-    });
-
-  } catch (error) {
-    console.error("KD status test error:", error.message);
-
-    res.status(500).json({
-      target: "KD",
-      error: error.message
-    });
-  }
-});
 
 /* ---------------- Register FCM device ---------------- */
 /* ---------------- Register FCM device ---------------- */
