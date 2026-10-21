@@ -1,3 +1,4 @@
+
 const express = require("express");
 const { TelegramClient } = require("teleproto");
 const { StringSession } = require("teleproto/sessions");
@@ -22,33 +23,39 @@ app.use((req, res, next) => {
     "Content-Type"
   );
 
-  if (req.method === "OPTIONS") return res.sendStatus(204);
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+
   next();
 });
 
-/* ---------------- Firebase Admin ---------------- */
+/* Firebase Admin */
 
 let firebaseReady = false;
 
 try {
-  const serviceAccount = JSON.parse(
-    process.env.FIREBASE_SERVICE_ACCOUNT_JSON
-  );
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    const serviceAccount = JSON.parse(
+      process.env.FIREBASE_SERVICE_ACCOUNT_JSON
+    );
 
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-  });
+    if (!admin.apps.length) {
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+      });
+    }
 
-  firebaseReady = true;
-  console.log("Firebase Admin connected successfully.");
+    firebaseReady = true;
+    console.log("Firebase Admin connected.");
+  } else {
+    console.log("Firebase credentials not configured.");
+  }
 } catch (error) {
-  console.error(
-    "Firebase Admin setup failed:",
-    error.message
-  );
+  console.error("Firebase setup failed:", error.message);
 }
 
-/* ---------------- Telegram ---------------- */
+/* Telegram configuration */
 
 const apiId = Number(process.env.TELEGRAM_API_ID);
 const apiHash = process.env.TELEGRAM_API_HASH;
@@ -58,19 +65,84 @@ const targetPhone = process.env.TARGET_PHONE || "";
 let client = null;
 let telegramReady = false;
 
-/* ---------------- Push token ---------------- */
+/* Push notification state */
 
 let pushToken = "";
 let monitoringInitialized = false;
 let previousAvailability = null;
 
-/* ---------------- Telegram connection ---------------- */
+/* Normalize Telegram status */
+
+function getStatusName(status) {
+  if (!status) return "";
+
+  return (
+    status.className ||
+    status.constructor?.name ||
+    ""
+  );
+}
+
+/* Map Telegram status to readable availability */
+
+function mapAvailability(statusName) {
+  switch (statusName) {
+    case "UserStatusOnline":
+    case "userStatusOnline":
+      return "online";
+
+    case "UserStatusOffline":
+    case "userStatusOffline":
+      return "offline";
+
+    case "UserStatusRecently":
+    case "userStatusRecently":
+      return "recently";
+
+    case "UserStatusLastWeek":
+    case "userStatusLastWeek":
+      return "within_a_week";
+
+    case "UserStatusLastMonth":
+    case "userStatusLastMonth":
+      return "within_a_month";
+
+    default:
+      return "unavailable";
+  }
+}
+
+/* Human-readable message */
+
+function getStatusMessage(availability) {
+  switch (availability) {
+    case "online":
+      return "Contact is online";
+
+    case "offline":
+      return "Contact is offline";
+
+    case "recently":
+      return "Last seen recently";
+
+    case "within_a_week":
+      return "Last seen within a week";
+
+    case "within_a_month":
+      return "Last seen within a month";
+
+    default:
+      return "Contact status is unavailable";
+  }
+}
+
+/* Connect Telegram */
 
 async function connectTelegram() {
   try {
     if (!apiId || !apiHash || !sessionString) {
       console.error(
-        "Telegram environment variables are missing."
+        "Missing TELEGRAM_API_ID, TELEGRAM_API_HASH, or TELEGRAM_SESSION."
       );
       return;
     }
@@ -86,21 +158,14 @@ async function connectTelegram() {
     await client.getMe();
 
     telegramReady = true;
-
-    console.log(
-      "Telegram connected successfully."
-    );
+    console.log("Telegram connected successfully.");
   } catch (error) {
     telegramReady = false;
-
-    console.error(
-      "Telegram connection failed:",
-      error.message
-    );
+    console.error("Telegram connection failed:", error.message);
   }
 }
 
-/* ---------------- Get Telegram availability ---------------- */
+/* Get contact status */
 
 async function getAvailability() {
   if (!telegramReady || !client || !targetPhone) {
@@ -108,44 +173,16 @@ async function getAvailability() {
   }
 
   const user = await client.getEntity(targetPhone);
-  const status = user?.status;
+  const statusName = getStatusName(user?.status);
 
-  const statusName =
-    status?.className ||
-    status?.constructor?.name ||
-    "";
-
-  if (
-    statusName === "UserStatusOnline" ||
-    statusName === "userStatusOnline"
-  ) {
-    return "online";
-  }
-
-  if (
-    statusName === "UserStatusOffline" ||
-    statusName === "userStatusOffline"
-  ) {
-    return "offline";
-  }
-
-  if (
-    statusName === "UserStatusRecently" ||
-    statusName === "userStatusRecently"
-  ) {
-    return "recently";
-  }
-
-  return "unavailable";
+  return mapAvailability(statusName);
 }
 
-/* ---------------- Send push notification ---------------- */
+/* Send online notification */
 
 async function sendOnlineNotification() {
   if (!firebaseReady || !pushToken) {
-    console.log(
-      "Push notification skipped: Firebase or token unavailable."
-    );
+    console.log("Notification skipped: Firebase or token unavailable.");
     return;
   }
 
@@ -154,41 +191,30 @@ async function sendOnlineNotification() {
       token: pushToken,
       notification: {
         title: "Presence Alert",
-        body: "The authorized Telegram contact is online."
+        body: "The configured Telegram contact is online."
       }
     });
 
-    console.log(
-      "Online notification sent successfully."
-    );
+    console.log("Online notification sent.");
   } catch (error) {
-    console.error(
-      "FCM notification failed:",
-      error.message
-    );
+    console.error("Notification failed:", error.message);
   }
 }
 
-/* ---------------- Background monitoring ---------------- */
+/* Background monitoring */
 
 async function monitorPresence() {
   try {
     const availability = await getAvailability();
 
-    console.log(
-      "Presence:",
-      availability
-    );
+    console.log("Presence:", availability);
 
-    // First check only initializes the previous state.
-    // It will NOT send a notification immediately.
     if (!monitoringInitialized) {
       previousAvailability = availability;
       monitoringInitialized = true;
       return;
     }
 
-    // Notification only when status changes TO online.
     if (
       availability === "online" &&
       previousAvailability !== "online"
@@ -197,16 +223,12 @@ async function monitorPresence() {
     }
 
     previousAvailability = availability;
-
   } catch (error) {
-    console.error(
-      "Background monitoring error:",
-      error.message
-    );
+    console.error("Monitoring error:", error.message);
   }
 }
 
-/* ---------------- Home ---------------- */
+/* Home endpoint */
 
 app.get("/", (req, res) => {
   res.json({
@@ -217,7 +239,7 @@ app.get("/", (req, res) => {
   });
 });
 
-/* ---------------- Telegram status API ---------------- */
+/* Telegram status endpoint */
 
 app.get("/api/status", async (req, res) => {
   try {
@@ -226,8 +248,7 @@ app.get("/api/status", async (req, res) => {
         connected: false,
         online: false,
         availability: "unavailable",
-        message:
-          "Telegram account is not connected"
+        message: "Telegram account is not connected"
       });
     }
 
@@ -236,82 +257,38 @@ app.get("/api/status", async (req, res) => {
         connected: true,
         online: false,
         availability: "unavailable",
-        message:
-          "Target contact is not configured"
+        message: "Target contact is not configured"
       });
     }
 
-    const user = await client.getEntity(
-      targetPhone
-    );
-
-    const status = user?.status;
-
-    const statusName =
-      status?.className ||
-      status?.constructor?.name ||
-      "";
-
-    const online =
-      statusName === "UserStatusOnline" ||
-      statusName === "userStatusOnline";
-
-    let availability = "unavailable";
-
-    if (online) {
-      availability = "online";
-    } else if (
-      statusName === "UserStatusOffline" ||
-      statusName === "userStatusOffline"
-    ) {
-      availability = "offline";
-    } else if (
-      statusName === "UserStatusRecently" ||
-      statusName === "userStatusRecently"
-    ) {
-      availability = "recently";
-    }
+    const user = await client.getEntity(targetPhone);
+    const statusName = getStatusName(user?.status);
+    const availability = mapAvailability(statusName);
 
     res.json({
       connected: true,
-      online,
-      status: statusName,
+      online: availability === "online",
+      status: statusName || "unknown",
       availability,
-      message:
-        availability === "online"
-          ? "Contact is online"
-          : availability === "offline"
-          ? "Contact is offline"
-          : availability === "recently"
-          ? "Contact was recently active"
-          : "Contact status is unavailable"
+      message: getStatusMessage(availability)
     });
-
   } catch (error) {
-    console.error(
-      "Status check error:",
-      error.message
-    );
+    console.error("Status check failed:", error.message);
 
     res.status(500).json({
       connected: telegramReady,
       online: false,
       availability: "unavailable",
-      message:
-        "Could not find or check the contact"
+      message: "Could not retrieve contact status"
     });
   }
 });
 
-
-/* ---------------- Register FCM device ---------------- */
-/* ---------------- Register FCM device ---------------- */
+/* Register push notification device */
 
 app.post("/api/push/register", (req, res) => {
   try {
-    const token = String(
-      req.body?.token || ""
-    ).trim();
+    const token = String(req.body?.token || "").trim();
 
     if (!token) {
       return res.status(400).json({
@@ -322,20 +299,14 @@ app.post("/api/push/register", (req, res) => {
 
     pushToken = token;
 
-    console.log(
-      "FCM device registered successfully."
-    );
+    console.log("Push device registered.");
 
     res.json({
       ok: true,
       message: "Push device registered"
     });
-
   } catch (error) {
-    console.error(
-      "Push registration error:",
-      error.message
-    );
+    console.error("Push registration failed:", error.message);
 
     res.status(500).json({
       ok: false,
@@ -344,20 +315,14 @@ app.post("/api/push/register", (req, res) => {
   }
 });
 
-/* ---------------- Start server ---------------- */
+/* Start server */
 
-connectTelegram().finally(() => {
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 
-  app.listen(PORT, () => {
-    console.log(
-      `Server running on port ${PORT}`
-    );
+  connectTelegram().then(() => {
+    monitorPresence();
 
-    // Check Telegram presence every 5 seconds.
-    setInterval(
-      monitorPresence,
-      5000
-    );
+    setInterval(monitorPresence, 5000);
   });
-
 });
